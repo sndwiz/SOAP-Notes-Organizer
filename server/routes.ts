@@ -750,6 +750,198 @@ Suggest up to 3 diagnoses ranked by confidence. Use standard ICD-10-CM F-codes. 
   });
 
   // ==================
+  // Audit Logs (HIPAA)
+  // ==================
+  const logAuditEvent = async (req: any, action: string, resourceType: string, resourceId?: string, details?: string) => {
+    try {
+      const userId = req.user?.claims?.sub || req.portalClientId || 'unknown';
+      await storage.createAuditLog({
+        userId,
+        action,
+        resourceType,
+        resourceId: resourceId || null,
+        details: details || null,
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
+        userAgent: req.headers['user-agent'] || null,
+      });
+    } catch (e) {
+      console.error("Audit log error:", e);
+    }
+  };
+
+  app.get(api.auditLogs.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const logs = await storage.getAuditLogs(req.user.claims.sub);
+      await logAuditEvent(req, 'view', 'audit_log', undefined, 'Viewed audit log list');
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Consent Documents
+  // ==================
+  app.get(api.consentDocuments.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const docs = await storage.getConsentDocuments(req.user.claims.sub);
+      await logAuditEvent(req, 'view', 'consent_document', undefined, 'Viewed consent documents list');
+      res.json(docs);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.consentDocuments.get.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const doc = await storage.getConsentDocument(Number(req.params.id));
+      if (!doc) return res.status(404).json({ message: "Consent document not found" });
+      if (doc.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await logAuditEvent(req, 'view', 'consent_document', String(doc.id));
+      res.json(doc);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.consentDocuments.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.consentDocuments.create.input.parse(req.body);
+      const doc = await storage.createConsentDocument(req.user.claims.sub, input);
+      await logAuditEvent(req, 'create', 'consent_document', String(doc.id), `Created ${input.documentType}`);
+      res.status(201).json(doc);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.consentDocuments.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getConsentDocument(id);
+      if (!existing) return res.status(404).json({ message: "Consent document not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.consentDocuments.update.input.parse(req.body);
+      const updated = await storage.updateConsentDocument(id, input);
+      await logAuditEvent(req, 'update', 'consent_document', String(id), `Updated consent document`);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete(api.consentDocuments.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getConsentDocument(id);
+      if (!existing) return res.status(404).json({ message: "Consent document not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteConsentDocument(id);
+      await logAuditEvent(req, 'delete', 'consent_document', String(id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Treatment Plans
+  // ==================
+  app.get(api.treatmentPlans.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const plans = await storage.getTreatmentPlans(req.user.claims.sub);
+      await logAuditEvent(req, 'view', 'treatment_plan', undefined, 'Viewed treatment plans list');
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.treatmentPlans.get.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const plan = await storage.getTreatmentPlan(Number(req.params.id));
+      if (!plan) return res.status(404).json({ message: "Treatment plan not found" });
+      if (plan.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await logAuditEvent(req, 'view', 'treatment_plan', String(plan.id));
+      res.json(plan);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.treatmentPlans.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.treatmentPlans.create.input.parse(req.body);
+      const plan = await storage.createTreatmentPlan(req.user.claims.sub, input);
+      await logAuditEvent(req, 'create', 'treatment_plan', String(plan.id));
+      res.status(201).json(plan);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.treatmentPlans.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getTreatmentPlan(id);
+      if (!existing) return res.status(404).json({ message: "Treatment plan not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.treatmentPlans.update.input.parse(req.body);
+      const updated = await storage.updateTreatmentPlan(id, input);
+      await logAuditEvent(req, 'update', 'treatment_plan', String(id));
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete(api.treatmentPlans.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getTreatmentPlan(id);
+      if (!existing) return res.status(404).json({ message: "Treatment plan not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteTreatmentPlan(id);
+      await logAuditEvent(req, 'delete', 'treatment_plan', String(id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Superbill Generation (from billing record)
+  // ==================
+  app.get('/api/billing-records/:id/superbill', isAuthenticated, async (req: any, res) => {
+    try {
+      const record = await storage.getBillingRecord(Number(req.params.id));
+      if (!record) return res.status(404).json({ message: "Billing record not found" });
+      if (record.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const client = record.clientId ? await storage.getClient(record.clientId) : null;
+      await logAuditEvent(req, 'export', 'billing_record', String(record.id), 'Superbill generated');
+      res.json({
+        record,
+        client,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
   // Utah Codes
   // ==================
   app.get(api.utahCodes.list.path, isAuthenticated, async (req: any, res) => {

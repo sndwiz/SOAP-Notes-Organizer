@@ -44,6 +44,9 @@ shared/
 - `intake_forms` - Patient intake forms (demographics, mental health history, consent, insurance info)
 - `billing_records` - Insurance billing and claims tracking (CPT codes, ICD codes, claim status)
 - `utah_codes` - Utah mental health law reference codes
+- `audit_logs` - HIPAA audit trail (action, resourceType, resourceId, IP, userAgent, timestamp)
+- `consent_documents` - Consent tracking (documentType, status: pending/signed/expired, signedAt, expiresAt, witnessName)
+- `treatment_plans` - Treatment plans (diagnoses, goals with objectives, interventions, frequency, startDate, reviewDate)
 
 ## Key Features
 - Speech-to-text dictation (WebKit SpeechRecognition, continuous mode)
@@ -60,6 +63,10 @@ shared/
 - Utah mental health law reference with AI-assisted search
 - Client portal with intake forms, document viewing, and messaging
 - Dual authentication (Replit Auth for providers, email/password for client portal)
+- HIPAA compliance: audit logging, consent tracking, treatment plans
+- Session auto-timeout (15 min inactivity) with 2-minute warning dialog
+- Compliance dashboard with consent tracking, treatment plan management, audit log viewer
+- Printable clinical paperwork: Informed Consent, HIPAA Notice, ROI, Telehealth Consent, Cancellation Policy, Financial Agreement, Superbill, Discharge Summary
 
 ## Architecture Decisions
 - **Dual Auth**: Providers authenticate via Replit Auth (OIDC). Clients authenticate via email/password stored in client_portal_accounts with bcryptjs hashing. Portal sessions stored in express-session (portalClientId, portalUserId).
@@ -68,13 +75,22 @@ shared/
 - **Messaging**: Thread-based model. Provider messages via /api/message-threads/:id/messages. Client messages via /api/portal/messages/:threadId. Auto mark-read on view.
 - **Utah Law AI**: POST /api/utah-codes/ai-search searches DB first, then passes results to OpenAI gpt-4o-mini for contextual legal summary.
 
+## Architecture Decisions (HIPAA)
+- **Audit Logging**: logAuditEvent helper in routes.ts logs all sensitive operations (view/create/update/delete) on consent documents, treatment plans, billing records
+- **Session Timeout**: 15-minute inactivity timer in LayoutShell with 2-minute warning dialog. Events: mousedown, keydown, scroll, touchstart
+- **Consent Tracking**: Status lifecycle: pending -> signed -> expired. Tracks signature data, witness, expiration dates
+- **Treatment Plans**: Structured goals format with objectives, target dates, status tracking per goal
+
 ## Recent Changes (Feb 2026)
-- Added 6 new database tables: client_portal_accounts, message_threads, messages, intake_forms, billing_records, utah_codes
-- Built 27+ new API endpoints with authentication and ownership checks
-- Created provider-side pages: Messaging, Billing, Utah Law Reference
+- Added 9 new database tables: client_portal_accounts, message_threads, messages, intake_forms, billing_records, utah_codes, audit_logs, consent_documents, treatment_plans
+- Built 40+ new API endpoints with authentication, ownership checks, and audit logging
+- Created provider-side pages: Messaging, Billing, Utah Law Reference, Compliance, Paperwork
 - Created client portal: Login page, Dashboard with Documents/Intake Forms/Messages tabs
 - Implemented dual auth system (Replit Auth + bcryptjs email/password)
-- Updated navigation sidebar with Messaging, Billing, Utah Law sections
+- Added HIPAA compliance infrastructure: audit logging, consent tracking, treatment plans
+- Added session auto-timeout for HIPAA security
+- Built 8 printable clinical document templates with @media print formatting
+- Updated navigation sidebar with all new sections
 
 ## User Preferences
 - PWA approach for mobile instead of native apps

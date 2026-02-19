@@ -22,6 +22,8 @@ import CeResourcesPage from "@/pages/ce-resources";
 import MessagingPage from "@/pages/messaging";
 import BillingPage from "@/pages/billing";
 import UtahLawPage from "@/pages/utah-law";
+import CompliancePage from "@/pages/compliance";
+import PaperworkPage from "@/pages/paperwork";
 import PortalLogin from "@/pages/portal-login";
 import PortalDashboard from "@/pages/portal-dashboard";
 
@@ -67,6 +69,8 @@ function Router() {
       <Route path="/messaging" component={() => <ProtectedRoute component={MessagingPage} />} />
       <Route path="/billing" component={() => <ProtectedRoute component={BillingPage} />} />
       <Route path="/utah-law" component={() => <ProtectedRoute component={UtahLawPage} />} />
+      <Route path="/compliance" component={() => <ProtectedRoute component={CompliancePage} />} />
+      <Route path="/paperwork" component={() => <ProtectedRoute component={PaperworkPage} />} />
       <Route component={NotFound} />
     </Switch>
   );

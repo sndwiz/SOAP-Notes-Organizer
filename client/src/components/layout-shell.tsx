@@ -4,18 +4,56 @@ import { useQuery } from "@tanstack/react-query";
 import {
   FileText, Home, LogOut, PlusCircle, Menu, Activity, Users,
   Calendar, CheckSquare, FolderOpen, Settings, Bell, BarChart3,
-  Share2, Shield, GraduationCap, DollarSign, Scale, MessageSquare
+  Share2, Shield, ShieldCheck, GraduationCap, DollarSign, Scale, MessageSquare, ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const TIMEOUT_MS = 15 * 60 * 1000;
+  const WARNING_MS = TIMEOUT_MS - 2 * 60 * 1000;
+
+  const resetTimer = useCallback(() => {
+    setShowTimeoutWarning(false);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (warningRef.current) clearTimeout(warningRef.current);
+    warningRef.current = setTimeout(() => setShowTimeoutWarning(true), WARNING_MS);
+    timeoutRef.current = setTimeout(() => logout(), TIMEOUT_MS);
+  }, [logout]);
+
+  useEffect(() => {
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    const handler = () => {
+      if (!showTimeoutWarning) resetTimer();
+    };
+    events.forEach(e => window.addEventListener(e, handler));
+    resetTimer();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, handler));
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (warningRef.current) clearTimeout(warningRef.current);
+    };
+  }, [resetTimer, showTimeoutWarning]);
 
   const { data: notifications } = useQuery({
     queryKey: ['/api/notifications'],
@@ -46,6 +84,8 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
     { name: 'Billing', href: '/billing', icon: DollarSign },
     { name: 'CE Resources', href: '/ce-resources', icon: GraduationCap },
     { name: 'Utah Law', href: '/utah-law', icon: Scale },
+    { name: 'Paperwork', href: '/paperwork', icon: ClipboardList },
+    { name: 'Compliance', href: '/compliance', icon: ShieldCheck },
   ];
 
   const systemNav = [
@@ -161,6 +201,25 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      <AlertDialog open={showTimeoutWarning} onOpenChange={() => {}}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Session Timeout Warning</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your session will expire in 2 minutes due to inactivity. This is required for HIPAA compliance to protect patient information. Click "Stay Logged In" to continue your session.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => logout()} data-testid="button-timeout-logout">
+              Log Out Now
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={resetTimer} data-testid="button-stay-logged-in">
+              Stay Logged In
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

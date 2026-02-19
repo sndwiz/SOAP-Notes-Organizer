@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertSoapNoteSchema, soapNotes, insertClientSchema, clients, insertTaskSchema, tasks, insertDocumentSchema, documents, insertNotificationSchema, notifications, insertReferralSchema, referrals, insertSafetyPlanSchema, safetyPlans, insertCeCreditSchema, ceCredits, insertMessageThreadSchema, messageThreads, insertMessageSchema, messages, insertIntakeFormSchema, intakeForms, insertBillingRecordSchema, billingRecords, utahCodes } from './schema';
+import { insertSoapNoteSchema, soapNotes, insertClientSchema, clients, insertTaskSchema, tasks, insertDocumentSchema, documents, insertNotificationSchema, notifications, insertReferralSchema, referrals, insertSafetyPlanSchema, safetyPlans, insertCeCreditSchema, ceCredits, insertMessageThreadSchema, messageThreads, insertMessageSchema, messages, insertIntakeFormSchema, intakeForms, insertBillingRecordSchema, billingRecords, utahCodes, auditLogs, insertConsentDocumentSchema, consentDocuments, insertTreatmentPlanSchema, treatmentPlans } from './schema';
 
 export const errorSchemas = {
   validation: z.object({ message: z.string(), field: z.string().optional() }),
@@ -348,6 +348,77 @@ export const api = {
       path: '/api/utah-codes/ai-search' as const,
       input: z.object({ query: z.string().min(1) }),
       responses: { 200: z.object({ results: z.array(z.any()), aiSummary: z.string() }) },
+    },
+  },
+
+  // Audit Logs (HIPAA)
+  auditLogs: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/audit-logs' as const,
+      responses: { 200: z.array(z.custom<typeof auditLogs.$inferSelect>()) },
+    },
+  },
+
+  // Consent Documents
+  consentDocuments: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/consent-documents' as const,
+      responses: { 200: z.array(z.custom<typeof consentDocuments.$inferSelect>()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/consent-documents/:id' as const,
+      responses: { 200: z.custom<typeof consentDocuments.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/consent-documents' as const,
+      input: insertConsentDocumentSchema,
+      responses: { 201: z.custom<typeof consentDocuments.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/consent-documents/:id' as const,
+      input: insertConsentDocumentSchema.partial(),
+      responses: { 200: z.custom<typeof consentDocuments.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/consent-documents/:id' as const,
+      responses: { 204: z.void(), 404: errorSchemas.notFound },
+    },
+  },
+
+  // Treatment Plans
+  treatmentPlans: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/treatment-plans' as const,
+      responses: { 200: z.array(z.custom<typeof treatmentPlans.$inferSelect>()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/treatment-plans/:id' as const,
+      responses: { 200: z.custom<typeof treatmentPlans.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/treatment-plans' as const,
+      input: insertTreatmentPlanSchema,
+      responses: { 201: z.custom<typeof treatmentPlans.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/treatment-plans/:id' as const,
+      input: insertTreatmentPlanSchema.partial(),
+      responses: { 200: z.custom<typeof treatmentPlans.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/treatment-plans/:id' as const,
+      responses: { 204: z.void(), 404: errorSchemas.notFound },
     },
   },
 

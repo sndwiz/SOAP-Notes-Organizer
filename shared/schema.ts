@@ -634,3 +634,101 @@ export const UTAH_CODE_CATEGORIES = [
   { id: "supervision", name: "Supervision Requirements" },
   { id: "reporting", name: "Mandatory Reporting" },
 ];
+
+// ============================================
+// AUDIT LOGS TABLE (HIPAA Compliance)
+// ============================================
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  details: text("details"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = Omit<AuditLog, 'id' | 'createdAt'>;
+
+// ============================================
+// CONSENT DOCUMENTS TABLE (HIPAA Compliance)
+// ============================================
+export const consentDocuments = pgTable("consent_documents", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  documentType: text("document_type").notNull(),
+  version: text("version").default("1.0"),
+  signedAt: timestamp("signed_at"),
+  expiresAt: timestamp("expires_at"),
+  signatureData: text("signature_data"),
+  witnessName: text("witness_name"),
+  status: text("status").default("pending"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConsentDocumentSchema = createInsertSchema(consentDocuments).omit({
+  id: true, userId: true, createdAt: true, updatedAt: true
+});
+export type ConsentDocument = typeof consentDocuments.$inferSelect;
+export type InsertConsentDocument = z.infer<typeof insertConsentDocumentSchema>;
+
+// ============================================
+// TREATMENT PLANS TABLE
+// ============================================
+export const treatmentPlans = pgTable("treatment_plans", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  diagnoses: jsonb("diagnoses").$type<{code: string, name: string}[]>().default([]),
+  presentingProblems: jsonb("presenting_problems").$type<string[]>().default([]),
+  goals: jsonb("goals").$type<{goal: string, objectives: string[], targetDate?: string, status: string}[]>().default([]),
+  interventions: jsonb("interventions").$type<string[]>().default([]),
+  frequency: text("frequency").default("Weekly"),
+  estimatedDuration: text("estimated_duration").default("6 months"),
+  startDate: timestamp("start_date").defaultNow(),
+  reviewDate: timestamp("review_date"),
+  status: text("status").default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTreatmentPlanSchema = createInsertSchema(treatmentPlans).omit({
+  id: true, userId: true, createdAt: true, updatedAt: true
+});
+export type TreatmentPlan = typeof treatmentPlans.$inferSelect;
+export type InsertTreatmentPlan = z.infer<typeof insertTreatmentPlanSchema>;
+
+// ============================================
+// CONSENT DOCUMENT TYPES
+// ============================================
+export const CONSENT_DOCUMENT_TYPES = [
+  { id: "informed-consent", name: "Informed Consent for Treatment" },
+  { id: "hipaa-npp", name: "Notice of Privacy Practices (HIPAA)" },
+  { id: "release-of-info", name: "Authorization for Release of Information" },
+  { id: "telehealth-consent", name: "Telehealth Informed Consent" },
+  { id: "cancellation-policy", name: "Cancellation/No-Show Policy" },
+  { id: "financial-agreement", name: "Financial Agreement" },
+  { id: "emergency-consent", name: "Emergency Contact & Consent" },
+  { id: "minor-consent", name: "Consent for Treatment of Minor" },
+];
+
+// ============================================
+// AUDIT LOG ACTION TYPES
+// ============================================
+export const AUDIT_ACTIONS = [
+  "view", "create", "update", "delete", "export", "print",
+  "login", "logout", "failed_login", "share", "download",
+] as const;
+
+export const AUDIT_RESOURCE_TYPES = [
+  "soap_note", "client", "document", "billing_record", "message",
+  "intake_form", "treatment_plan", "consent_document", "safety_plan",
+  "referral", "portal_account", "session",
+] as const;

@@ -14,6 +14,9 @@ import {
   intakeForms, type IntakeForm, type InsertIntakeForm,
   billingRecords, type BillingRecord, type InsertBillingRecord,
   utahCodes, type UtahCode,
+  auditLogs, type AuditLog, type InsertAuditLog,
+  consentDocuments, type ConsentDocument, type InsertConsentDocument,
+  treatmentPlans, type TreatmentPlan, type InsertTreatmentPlan,
 } from "@shared/schema";
 import { eq, desc, and, or, ilike } from "drizzle-orm";
 
@@ -108,6 +111,26 @@ export interface IStorage {
   getUtahCodes(): Promise<UtahCode[]>;
   searchUtahCodes(query: string): Promise<UtahCode[]>;
   createUtahCode(code: Omit<UtahCode, 'id'>): Promise<UtahCode>;
+
+  // Audit Logs (HIPAA)
+  getAuditLogs(userId: string): Promise<AuditLog[]>;
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+
+  // Consent Documents
+  getConsentDocuments(userId: string): Promise<ConsentDocument[]>;
+  getConsentDocumentsByClient(clientId: number): Promise<ConsentDocument[]>;
+  getConsentDocument(id: number): Promise<ConsentDocument | undefined>;
+  createConsentDocument(userId: string, doc: InsertConsentDocument): Promise<ConsentDocument>;
+  updateConsentDocument(id: number, updates: Partial<InsertConsentDocument>): Promise<ConsentDocument>;
+  deleteConsentDocument(id: number): Promise<void>;
+
+  // Treatment Plans
+  getTreatmentPlans(userId: string): Promise<TreatmentPlan[]>;
+  getTreatmentPlansByClient(clientId: number): Promise<TreatmentPlan[]>;
+  getTreatmentPlan(id: number): Promise<TreatmentPlan | undefined>;
+  createTreatmentPlan(userId: string, plan: InsertTreatmentPlan): Promise<TreatmentPlan>;
+  updateTreatmentPlan(id: number, updates: Partial<InsertTreatmentPlan>): Promise<TreatmentPlan>;
+  deleteTreatmentPlan(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -458,6 +481,78 @@ export class DatabaseStorage implements IStorage {
   async createUtahCode(code: Omit<UtahCode, 'id'>): Promise<UtahCode> {
     const [created] = await db.insert(utahCodes).values(code).returning();
     return created;
+  }
+
+  // ==================
+  // Audit Logs (HIPAA)
+  // ==================
+  async getAuditLogs(userId: string): Promise<AuditLog[]> {
+    return await db.select().from(auditLogs).where(eq(auditLogs.userId, userId)).orderBy(desc(auditLogs.createdAt)).limit(200);
+  }
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [created] = await db.insert(auditLogs).values(log).returning();
+    return created;
+  }
+
+  // ==================
+  // Consent Documents
+  // ==================
+  async getConsentDocuments(userId: string): Promise<ConsentDocument[]> {
+    return await db.select().from(consentDocuments).where(eq(consentDocuments.userId, userId)).orderBy(desc(consentDocuments.createdAt));
+  }
+
+  async getConsentDocumentsByClient(clientId: number): Promise<ConsentDocument[]> {
+    return await db.select().from(consentDocuments).where(eq(consentDocuments.clientId, clientId)).orderBy(desc(consentDocuments.createdAt));
+  }
+
+  async getConsentDocument(id: number): Promise<ConsentDocument | undefined> {
+    const [doc] = await db.select().from(consentDocuments).where(eq(consentDocuments.id, id));
+    return doc;
+  }
+
+  async createConsentDocument(userId: string, doc: InsertConsentDocument): Promise<ConsentDocument> {
+    const [created] = await db.insert(consentDocuments).values({ ...doc, userId }).returning();
+    return created;
+  }
+
+  async updateConsentDocument(id: number, updates: Partial<InsertConsentDocument>): Promise<ConsentDocument> {
+    const [updated] = await db.update(consentDocuments).set({ ...updates, updatedAt: new Date() }).where(eq(consentDocuments.id, id)).returning();
+    return updated;
+  }
+
+  async deleteConsentDocument(id: number): Promise<void> {
+    await db.delete(consentDocuments).where(eq(consentDocuments.id, id));
+  }
+
+  // ==================
+  // Treatment Plans
+  // ==================
+  async getTreatmentPlans(userId: string): Promise<TreatmentPlan[]> {
+    return await db.select().from(treatmentPlans).where(eq(treatmentPlans.userId, userId)).orderBy(desc(treatmentPlans.updatedAt));
+  }
+
+  async getTreatmentPlansByClient(clientId: number): Promise<TreatmentPlan[]> {
+    return await db.select().from(treatmentPlans).where(eq(treatmentPlans.clientId, clientId)).orderBy(desc(treatmentPlans.updatedAt));
+  }
+
+  async getTreatmentPlan(id: number): Promise<TreatmentPlan | undefined> {
+    const [plan] = await db.select().from(treatmentPlans).where(eq(treatmentPlans.id, id));
+    return plan;
+  }
+
+  async createTreatmentPlan(userId: string, plan: InsertTreatmentPlan): Promise<TreatmentPlan> {
+    const [created] = await db.insert(treatmentPlans).values({ ...plan, userId }).returning();
+    return created;
+  }
+
+  async updateTreatmentPlan(id: number, updates: Partial<InsertTreatmentPlan>): Promise<TreatmentPlan> {
+    const [updated] = await db.update(treatmentPlans).set({ ...updates, updatedAt: new Date() }).where(eq(treatmentPlans.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTreatmentPlan(id: number): Promise<void> {
+    await db.delete(treatmentPlans).where(eq(treatmentPlans.id, id));
   }
 }
 
