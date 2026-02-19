@@ -28,7 +28,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16 border-2 border-border">
-                <AvatarImage src={user?.profileImageUrl} />
+                <AvatarImage src={user?.profileImageUrl ?? undefined} />
                 <AvatarFallback className="bg-primary/10 text-primary text-lg">
                   {user?.firstName?.[0] || 'U'}
                 </AvatarFallback>

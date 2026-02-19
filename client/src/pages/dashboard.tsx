@@ -32,7 +32,7 @@ export default function Dashboard() {
 
   const filteredNotes = notes?.filter(note => 
     note.clientName.toLowerCase().includes(search.toLowerCase()) ||
-    note.assessment.toLowerCase().includes(search.toLowerCase())
+    (note.assessment ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   const stats = [
