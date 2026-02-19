@@ -73,7 +73,7 @@ export default function ClientsPage() {
                 <DialogTitle>Add New Client</DialogTitle>
               </DialogHeader>
               <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(formData); }} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>First Name *</Label>
                     <Input data-testid="input-first-name" value={formData.firstName} onChange={(e) => setFormData(p => ({ ...p, firstName: e.target.value }))} required />
@@ -91,7 +91,7 @@ export default function ClientsPage() {
                   <Label>Phone</Label>
                   <Input data-testid="input-client-phone" value={formData.phone} onChange={(e) => setFormData(p => ({ ...p, phone: e.target.value }))} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Insurance Provider</Label>
                     <Input value={formData.insuranceProvider} onChange={(e) => setFormData(p => ({ ...p, insuranceProvider: e.target.value }))} />

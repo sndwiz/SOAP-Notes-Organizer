@@ -89,7 +89,7 @@ export default function TasksPage() {
                   <Label>Description</Label>
                   <Textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="min-h-[60px]" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Priority</Label>
                     <Select value={formData.priority} onValueChange={v => setFormData(p => ({ ...p, priority: v }))}>

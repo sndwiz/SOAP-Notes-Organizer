@@ -143,7 +143,7 @@ export default function PortalDashboard() {
       case "demographics":
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>First Name</Label>
                 <Input data-testid="input-form-firstName" value={formData.firstName || ""} onChange={(e) => updateField("firstName", e.target.value)} />
@@ -161,7 +161,7 @@ export default function PortalDashboard() {
               <Label>Address</Label>
               <Input data-testid="input-form-address" value={formData.address || ""} onChange={(e) => updateField("address", e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Phone</Label>
                 <Input data-testid="input-form-phone" value={formData.phone || ""} onChange={(e) => updateField("phone", e.target.value)} />
@@ -171,7 +171,7 @@ export default function PortalDashboard() {
                 <Input data-testid="input-form-email" type="email" value={formData.email || ""} onChange={(e) => updateField("email", e.target.value)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Emergency Contact Name</Label>
                 <Input data-testid="input-form-emergencyName" value={formData.emergencyContactName || ""} onChange={(e) => updateField("emergencyContactName", e.target.value)} />
@@ -255,7 +255,7 @@ export default function PortalDashboard() {
               <Label>Insurance Provider</Label>
               <Input data-testid="input-form-insuranceProvider" value={formData.insuranceProvider || ""} onChange={(e) => updateField("insuranceProvider", e.target.value)} placeholder="e.g. Blue Cross Blue Shield" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Policy / Member ID</Label>
                 <Input data-testid="input-form-memberId" value={formData.memberId || ""} onChange={(e) => updateField("memberId", e.target.value)} />

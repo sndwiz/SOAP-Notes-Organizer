@@ -234,7 +234,7 @@ export default function MessagingPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ minHeight: "calc(100vh - 280px)" }}>
-          <Card className="lg:col-span-1 flex flex-col overflow-hidden">
+          <Card className={`lg:col-span-1 flex flex-col overflow-hidden ${selectedThreadId ? "hidden lg:flex" : "flex"}`}>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
               <CardTitle className="text-base">Threads</CardTitle>
               <Badge variant="secondary" className="text-xs">
@@ -320,7 +320,7 @@ export default function MessagingPage() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2 flex flex-col overflow-hidden">
+          <Card className={`lg:col-span-2 flex flex-col overflow-hidden ${selectedThreadId ? "flex" : "hidden lg:flex"}`}>
             {!selectedThreadId ? (
               <div className="flex-1 flex flex-col items-center justify-center py-16">
                 <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-4" />

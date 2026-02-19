@@ -296,7 +296,7 @@ export default function BillingPage() {
             />
           </div>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[200px]" data-testid="select-filter-status">
+            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-filter-status">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Claim Status" />
             </SelectTrigger>
@@ -512,7 +512,7 @@ function BillingFormDialog({
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Client *</Label>
             <Select value={form.clientId} onValueChange={(v) => setForm((p) => ({ ...p, clientId: v }))}>
@@ -546,7 +546,7 @@ function BillingFormDialog({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Service Date *</Label>
             <Input
@@ -635,7 +635,7 @@ function BillingFormDialog({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Amount ($) *</Label>
             <Input
@@ -662,7 +662,7 @@ function BillingFormDialog({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Insurance Provider</Label>
             <Input
