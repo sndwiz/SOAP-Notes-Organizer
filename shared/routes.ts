@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertSoapNoteSchema, soapNotes, insertClientSchema, clients, insertTaskSchema, tasks, insertDocumentSchema, documents, insertNotificationSchema, notifications, insertReferralSchema, referrals, insertSafetyPlanSchema, safetyPlans, insertCeCreditSchema, ceCredits } from './schema';
+import { insertSoapNoteSchema, soapNotes, insertClientSchema, clients, insertTaskSchema, tasks, insertDocumentSchema, documents, insertNotificationSchema, notifications, insertReferralSchema, referrals, insertSafetyPlanSchema, safetyPlans, insertCeCreditSchema, ceCredits, insertMessageThreadSchema, messageThreads, insertMessageSchema, messages, insertIntakeFormSchema, intakeForms, insertBillingRecordSchema, billingRecords, utahCodes } from './schema';
 
 export const errorSchemas = {
   validation: z.object({ message: z.string(), field: z.string().optional() }),
@@ -236,6 +236,169 @@ export const api = {
       method: 'DELETE' as const,
       path: '/api/ce-credits/:id' as const,
       responses: { 204: z.void(), 404: errorSchemas.notFound },
+    },
+  },
+
+  // Message Threads
+  messageThreads: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/message-threads' as const,
+      responses: { 200: z.array(z.custom<typeof messageThreads.$inferSelect>()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/message-threads/:id' as const,
+      responses: { 200: z.custom<typeof messageThreads.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/message-threads' as const,
+      input: insertMessageThreadSchema,
+      responses: { 201: z.custom<typeof messageThreads.$inferSelect>(), 400: errorSchemas.validation },
+    },
+  },
+
+  // Messages
+  messages: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/message-threads/:threadId/messages' as const,
+      responses: { 200: z.array(z.custom<typeof messages.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/message-threads/:threadId/messages' as const,
+      input: z.object({ body: z.string().min(1) }),
+      responses: { 201: z.custom<typeof messages.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    markRead: {
+      method: 'PUT' as const,
+      path: '/api/message-threads/:threadId/read' as const,
+      responses: { 200: z.object({ count: z.number() }) },
+    },
+  },
+
+  // Intake Forms
+  intakeForms: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/intake-forms' as const,
+      responses: { 200: z.array(z.custom<typeof intakeForms.$inferSelect>()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/intake-forms/:id' as const,
+      responses: { 200: z.custom<typeof intakeForms.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/intake-forms' as const,
+      input: insertIntakeFormSchema,
+      responses: { 201: z.custom<typeof intakeForms.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/intake-forms/:id' as const,
+      input: z.object({ status: z.string().optional(), formData: z.record(z.any()).optional() }),
+      responses: { 200: z.custom<typeof intakeForms.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+  },
+
+  // Billing Records
+  billingRecords: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/billing-records' as const,
+      responses: { 200: z.array(z.custom<typeof billingRecords.$inferSelect>()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/billing-records/:id' as const,
+      responses: { 200: z.custom<typeof billingRecords.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/billing-records' as const,
+      input: insertBillingRecordSchema,
+      responses: { 201: z.custom<typeof billingRecords.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/billing-records/:id' as const,
+      input: insertBillingRecordSchema.partial(),
+      responses: { 200: z.custom<typeof billingRecords.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/billing-records/:id' as const,
+      responses: { 204: z.void(), 404: errorSchemas.notFound },
+    },
+  },
+
+  // Utah Codes
+  utahCodes: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/utah-codes' as const,
+      responses: { 200: z.array(z.custom<typeof utahCodes.$inferSelect>()) },
+    },
+    search: {
+      method: 'POST' as const,
+      path: '/api/utah-codes/ai-search' as const,
+      input: z.object({ query: z.string().min(1) }),
+      responses: { 200: z.object({ results: z.array(z.any()), aiSummary: z.string() }) },
+    },
+  },
+
+  // Client Portal Auth
+  portalAuth: {
+    login: {
+      method: 'POST' as const,
+      path: '/api/portal/login' as const,
+      input: z.object({ email: z.string().email(), password: z.string().min(6) }),
+      responses: { 200: z.object({ client: z.any(), token: z.string() }) },
+    },
+    me: {
+      method: 'GET' as const,
+      path: '/api/portal/me' as const,
+      responses: { 200: z.any() },
+    },
+  },
+
+  // Client Portal (client-facing)
+  portal: {
+    documents: {
+      method: 'GET' as const,
+      path: '/api/portal/documents' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    intakeForms: {
+      method: 'GET' as const,
+      path: '/api/portal/intake-forms' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    submitIntakeForm: {
+      method: 'PUT' as const,
+      path: '/api/portal/intake-forms/:id' as const,
+      input: z.object({ formData: z.record(z.any()) }),
+      responses: { 200: z.any() },
+    },
+    threads: {
+      method: 'GET' as const,
+      path: '/api/portal/messages' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    threadMessages: {
+      method: 'GET' as const,
+      path: '/api/portal/messages/:threadId' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    sendMessage: {
+      method: 'POST' as const,
+      path: '/api/portal/messages/:threadId' as const,
+      input: z.object({ body: z.string().min(1) }),
+      responses: { 201: z.any() },
     },
   },
 };

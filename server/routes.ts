@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
@@ -6,6 +6,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import multer from "multer";
 import OpenAI from "openai";
+import bcrypt from "bcryptjs";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -544,6 +545,442 @@ Suggest up to 3 diagnoses ranked by confidence. Use standard ICD-10-CM F-codes. 
     } catch (error) {
       console.error("AI suggestion error:", error);
       res.status(500).json({ message: "Failed to generate AI suggestions" });
+    }
+  });
+
+  // ==================
+  // Message Threads
+  // ==================
+  app.get(api.messageThreads.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const threads = await storage.getMessageThreads(req.user.claims.sub);
+      res.json(threads);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.messageThreads.get.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const thread = await storage.getMessageThread(Number(req.params.id));
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+      if (thread.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      res.json(thread);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.messageThreads.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.messageThreads.create.input.parse(req.body);
+      const thread = await storage.createMessageThread({ ...input, userId: req.user.claims.sub });
+      res.status(201).json(thread);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Messages
+  // ==================
+  app.get(api.messages.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const threadId = Number(req.params.threadId);
+      const thread = await storage.getMessageThread(threadId);
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+      if (thread.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const msgs = await storage.getMessages(threadId);
+      res.json(msgs);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.messages.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const threadId = Number(req.params.threadId);
+      const thread = await storage.getMessageThread(threadId);
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+      if (thread.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.messages.create.input.parse(req.body);
+      const message = await storage.createMessage({ threadId, senderType: 'provider', body: input.body });
+      res.status(201).json(message);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.messages.markRead.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const threadId = Number(req.params.threadId);
+      const thread = await storage.getMessageThread(threadId);
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+      if (thread.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const count = await storage.markMessagesRead(threadId, 'client');
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Intake Forms
+  // ==================
+  app.get(api.intakeForms.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const forms = await storage.getIntakeForms(req.user.claims.sub);
+      res.json(forms);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.intakeForms.get.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const form = await storage.getIntakeForm(Number(req.params.id));
+      if (!form) return res.status(404).json({ message: "Intake form not found" });
+      if (form.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      res.json(form);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.intakeForms.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.intakeForms.create.input.parse(req.body);
+      const form = await storage.createIntakeForm({ ...input, userId: req.user.claims.sub });
+      res.status(201).json(form);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.intakeForms.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getIntakeForm(id);
+      if (!existing) return res.status(404).json({ message: "Intake form not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.intakeForms.update.input.parse(req.body);
+      const updated = await storage.updateIntakeForm(id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Billing Records
+  // ==================
+  app.get(api.billingRecords.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const records = await storage.getBillingRecords(req.user.claims.sub);
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.billingRecords.get.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const record = await storage.getBillingRecord(Number(req.params.id));
+      if (!record) return res.status(404).json({ message: "Billing record not found" });
+      if (record.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      res.json(record);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.billingRecords.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.billingRecords.create.input.parse(req.body);
+      const record = await storage.createBillingRecord(req.user.claims.sub, input);
+      res.status(201).json(record);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.billingRecords.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getBillingRecord(id);
+      if (!existing) return res.status(404).json({ message: "Billing record not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.billingRecords.update.input.parse(req.body);
+      const updated = await storage.updateBillingRecord(id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete(api.billingRecords.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getBillingRecord(id);
+      if (!existing) return res.status(404).json({ message: "Billing record not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteBillingRecord(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Utah Codes
+  // ==================
+  app.get(api.utahCodes.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const codes = await storage.getUtahCodes();
+      res.json(codes);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.utahCodes.search.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.utahCodes.search.input.parse(req.body);
+      const results = await storage.searchUtahCodes(input.query);
+
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const codesContext = results.map(c => `${c.section} - ${c.heading}: ${c.summary}`).join('\n');
+
+      const prompt = `You are a legal assistant specializing in Utah mental health regulations. The user searched for: "${input.query}"
+
+Here are the matching Utah codes found:
+${codesContext || 'No exact matches found in the database.'}
+
+Provide a concise, helpful summary of the relevant Utah regulations related to the user's query. If codes were found, explain their relevance. If no codes were found, provide general guidance about Utah mental health law on this topic.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+      });
+
+      const aiSummary = completion.choices[0]?.message?.content || "Unable to generate AI summary.";
+
+      res.json({ results, aiSummary });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      console.error("Utah codes AI search error:", err);
+      res.status(500).json({ message: "Failed to search Utah codes" });
+    }
+  });
+
+  // ==================
+  // Client Portal Auth
+  // ==================
+  const isPortalAuthenticated = (req: any, res: any, next: any) => {
+    const portalSession = req.session?.portalClientId;
+    const portalUserId = req.session?.portalUserId;
+    if (!portalSession || !portalUserId) {
+      return res.status(401).json({ message: "Portal authentication required" });
+    }
+    req.portalClientId = portalSession;
+    req.portalUserId = portalUserId;
+    next();
+  };
+
+  app.post(api.portalAuth.login.path, async (req: any, res) => {
+    try {
+      const input = api.portalAuth.login.input.parse(req.body);
+      const account = await storage.getPortalAccountByEmail(input.email);
+      if (!account) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      if (account.status !== 'active') {
+        return res.status(401).json({ message: "Account is not active" });
+      }
+      const valid = await bcrypt.compare(input.password, account.hashedPassword);
+      if (!valid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      await storage.updatePortalAccountLogin(account.id);
+      const client = await storage.getClient(account.clientId);
+
+      req.session.portalClientId = account.clientId;
+      req.session.portalUserId = account.userId;
+
+      res.json({ client, token: 'session' });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.portalAuth.me.path, async (req: any, res) => {
+    try {
+      const portalClientId = req.session?.portalClientId;
+      const portalUserId = req.session?.portalUserId;
+      if (!portalClientId || !portalUserId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      const client = await storage.getClient(portalClientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      res.json({ client, userId: portalUserId });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Client Portal Data Routes
+  // ==================
+  app.get(api.portal.documents.path, isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const docs = await storage.getDocuments(req.portalUserId, req.portalClientId);
+      const sharedDocs = docs.filter(d => d.sharedWithClient);
+      const docsWithoutData = sharedDocs.map(({ data, ...rest }) => rest);
+      res.json(docsWithoutData);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.portal.intakeForms.path, isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const forms = await storage.getIntakeFormsByClient(req.portalClientId);
+      res.json(forms);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.portal.submitIntakeForm.path, isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const form = await storage.getIntakeForm(id);
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      if (form.clientId !== req.portalClientId) return res.status(403).json({ message: "Forbidden" });
+      const input = api.portal.submitIntakeForm.input.parse(req.body);
+      const updated = await storage.updateIntakeForm(id, { formData: input.formData, status: 'submitted', submittedAt: new Date() });
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.portal.threads.path, isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const threads = await storage.getMessageThreadsByClient(req.portalClientId);
+      res.json(threads);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.portal.threadMessages.path, isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const threadId = Number(req.params.threadId);
+      const thread = await storage.getMessageThread(threadId);
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+      if (thread.clientId !== req.portalClientId) return res.status(403).json({ message: "Forbidden" });
+      const msgs = await storage.getMessages(threadId);
+      await storage.markMessagesRead(threadId, 'provider');
+      res.json(msgs);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.portal.sendMessage.path, isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const threadId = Number(req.params.threadId);
+      const thread = await storage.getMessageThread(threadId);
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+      if (thread.clientId !== req.portalClientId) return res.status(403).json({ message: "Forbidden" });
+      const input = api.portal.sendMessage.input.parse(req.body);
+      const message = await storage.createMessage({ threadId, senderType: 'client', body: input.body });
+      res.status(201).json(message);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Provider Portal Account Management
+  // ==================
+  app.post('/api/portal-accounts', isAuthenticated, async (req: any, res) => {
+    try {
+      const input = z.object({
+        clientId: z.number(),
+        email: z.string().email(),
+        password: z.string().min(6),
+      }).parse(req.body);
+
+      const existingAccount = await storage.getPortalAccountByEmail(input.email);
+      if (existingAccount) {
+        return res.status(400).json({ message: "An account with this email already exists" });
+      }
+
+      const client = await storage.getClient(input.clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (client.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+
+      const hashedPassword = await bcrypt.hash(input.password, 10);
+      const account = await storage.createPortalAccount({
+        clientId: input.clientId,
+        userId: req.user.claims.sub,
+        email: input.email,
+        hashedPassword,
+        status: 'active',
+      });
+      const { hashedPassword: _, ...safeAccount } = account;
+      res.status(201).json(safeAccount);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/portal-accounts', isAuthenticated, async (req: any, res) => {
+    try {
+      const accounts = await storage.getPortalAccountsByProvider(req.user.claims.sub);
+      const safeAccounts = accounts.map(({ hashedPassword, ...rest }) => rest);
+      res.json(safeAccounts);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

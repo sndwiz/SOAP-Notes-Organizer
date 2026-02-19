@@ -8,8 +8,14 @@ import {
   referrals, type Referral, type InsertReferral,
   safetyPlans, type SafetyPlan, type InsertSafetyPlan,
   ceCredits, type CeCredit, type InsertCeCredit,
+  clientPortalAccounts, type ClientPortalAccount, type InsertClientPortalAccount,
+  messageThreads, type MessageThread, type InsertMessageThread,
+  messages, type Message, type InsertMessage,
+  intakeForms, type IntakeForm, type InsertIntakeForm,
+  billingRecords, type BillingRecord, type InsertBillingRecord,
+  utahCodes, type UtahCode,
 } from "@shared/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // SOAP Notes
@@ -64,6 +70,44 @@ export interface IStorage {
   createCeCredit(userId: string, credit: InsertCeCredit): Promise<CeCredit>;
   updateCeCredit(id: number, updates: Partial<InsertCeCredit>): Promise<CeCredit>;
   deleteCeCredit(id: number): Promise<void>;
+
+  // Client Portal Accounts
+  getPortalAccountByEmail(email: string): Promise<ClientPortalAccount | undefined>;
+  getPortalAccountByClientId(clientId: number): Promise<ClientPortalAccount | undefined>;
+  getPortalAccountsByProvider(userId: string): Promise<ClientPortalAccount[]>;
+  createPortalAccount(account: InsertClientPortalAccount): Promise<ClientPortalAccount>;
+  updatePortalAccountLogin(id: number): Promise<void>;
+
+  // Message Threads
+  getMessageThreads(userId: string): Promise<MessageThread[]>;
+  getMessageThreadsByClient(clientId: number): Promise<MessageThread[]>;
+  getMessageThread(id: number): Promise<MessageThread | undefined>;
+  createMessageThread(thread: InsertMessageThread): Promise<MessageThread>;
+
+  // Messages
+  getMessages(threadId: number): Promise<Message[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
+  markMessagesRead(threadId: number, senderType: string): Promise<number>;
+  getUnreadMessageCount(userId: string): Promise<number>;
+
+  // Intake Forms
+  getIntakeForms(userId: string): Promise<IntakeForm[]>;
+  getIntakeFormsByClient(clientId: number): Promise<IntakeForm[]>;
+  getIntakeForm(id: number): Promise<IntakeForm | undefined>;
+  createIntakeForm(form: InsertIntakeForm): Promise<IntakeForm>;
+  updateIntakeForm(id: number, updates: { status?: string; formData?: Record<string, any>; submittedAt?: Date; reviewedAt?: Date }): Promise<IntakeForm>;
+
+  // Billing Records
+  getBillingRecords(userId: string): Promise<BillingRecord[]>;
+  getBillingRecord(id: number): Promise<BillingRecord | undefined>;
+  createBillingRecord(userId: string, record: InsertBillingRecord): Promise<BillingRecord>;
+  updateBillingRecord(id: number, updates: Partial<InsertBillingRecord>): Promise<BillingRecord>;
+  deleteBillingRecord(id: number): Promise<void>;
+
+  // Utah Codes
+  getUtahCodes(): Promise<UtahCode[]>;
+  searchUtahCodes(query: string): Promise<UtahCode[]>;
+  createUtahCode(code: Omit<UtahCode, 'id'>): Promise<UtahCode>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -262,6 +306,158 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCeCredit(id: number): Promise<void> {
     await db.delete(ceCredits).where(eq(ceCredits.id, id));
+  }
+
+  // ==================
+  // Client Portal Accounts
+  // ==================
+  async getPortalAccountByEmail(email: string): Promise<ClientPortalAccount | undefined> {
+    const [account] = await db.select().from(clientPortalAccounts).where(eq(clientPortalAccounts.email, email));
+    return account;
+  }
+
+  async getPortalAccountByClientId(clientId: number): Promise<ClientPortalAccount | undefined> {
+    const [account] = await db.select().from(clientPortalAccounts).where(eq(clientPortalAccounts.clientId, clientId));
+    return account;
+  }
+
+  async getPortalAccountsByProvider(userId: string): Promise<ClientPortalAccount[]> {
+    return await db.select().from(clientPortalAccounts).where(eq(clientPortalAccounts.userId, userId)).orderBy(desc(clientPortalAccounts.createdAt));
+  }
+
+  async createPortalAccount(account: InsertClientPortalAccount): Promise<ClientPortalAccount> {
+    const [created] = await db.insert(clientPortalAccounts).values(account).returning();
+    return created;
+  }
+
+  async updatePortalAccountLogin(id: number): Promise<void> {
+    await db.update(clientPortalAccounts).set({ lastLoginAt: new Date() }).where(eq(clientPortalAccounts.id, id));
+  }
+
+  // ==================
+  // Message Threads
+  // ==================
+  async getMessageThreads(userId: string): Promise<MessageThread[]> {
+    return await db.select().from(messageThreads).where(eq(messageThreads.userId, userId)).orderBy(desc(messageThreads.lastMessageAt));
+  }
+
+  async getMessageThreadsByClient(clientId: number): Promise<MessageThread[]> {
+    return await db.select().from(messageThreads).where(eq(messageThreads.clientId, clientId)).orderBy(desc(messageThreads.lastMessageAt));
+  }
+
+  async getMessageThread(id: number): Promise<MessageThread | undefined> {
+    const [thread] = await db.select().from(messageThreads).where(eq(messageThreads.id, id));
+    return thread;
+  }
+
+  async createMessageThread(thread: InsertMessageThread): Promise<MessageThread> {
+    const [created] = await db.insert(messageThreads).values(thread).returning();
+    return created;
+  }
+
+  // ==================
+  // Messages
+  // ==================
+  async getMessages(threadId: number): Promise<Message[]> {
+    return await db.select().from(messages).where(eq(messages.threadId, threadId)).orderBy(messages.createdAt);
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const [created] = await db.insert(messages).values(message).returning();
+    await db.update(messageThreads).set({ lastMessageAt: new Date() }).where(eq(messageThreads.id, message.threadId));
+    return created;
+  }
+
+  async markMessagesRead(threadId: number, senderType: string): Promise<number> {
+    const result = await db.update(messages).set({ isRead: true }).where(and(eq(messages.threadId, threadId), eq(messages.senderType, senderType), eq(messages.isRead, false))).returning();
+    return result.length;
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    const threads = await db.select().from(messageThreads).where(eq(messageThreads.userId, userId));
+    let count = 0;
+    for (const thread of threads) {
+      const unread = await db.select().from(messages).where(and(eq(messages.threadId, thread.id), eq(messages.senderType, 'client'), eq(messages.isRead, false)));
+      count += unread.length;
+    }
+    return count;
+  }
+
+  // ==================
+  // Intake Forms
+  // ==================
+  async getIntakeForms(userId: string): Promise<IntakeForm[]> {
+    return await db.select().from(intakeForms).where(eq(intakeForms.userId, userId)).orderBy(desc(intakeForms.createdAt));
+  }
+
+  async getIntakeFormsByClient(clientId: number): Promise<IntakeForm[]> {
+    return await db.select().from(intakeForms).where(eq(intakeForms.clientId, clientId)).orderBy(desc(intakeForms.createdAt));
+  }
+
+  async getIntakeForm(id: number): Promise<IntakeForm | undefined> {
+    const [form] = await db.select().from(intakeForms).where(eq(intakeForms.id, id));
+    return form;
+  }
+
+  async createIntakeForm(form: InsertIntakeForm): Promise<IntakeForm> {
+    const [created] = await db.insert(intakeForms).values(form).returning();
+    return created;
+  }
+
+  async updateIntakeForm(id: number, updates: { status?: string; formData?: Record<string, any>; submittedAt?: Date; reviewedAt?: Date }): Promise<IntakeForm> {
+    const [updated] = await db.update(intakeForms).set(updates).where(eq(intakeForms.id, id)).returning();
+    return updated;
+  }
+
+  // ==================
+  // Billing Records
+  // ==================
+  async getBillingRecords(userId: string): Promise<BillingRecord[]> {
+    return await db.select().from(billingRecords).where(eq(billingRecords.userId, userId)).orderBy(desc(billingRecords.serviceDate));
+  }
+
+  async getBillingRecord(id: number): Promise<BillingRecord | undefined> {
+    const [record] = await db.select().from(billingRecords).where(eq(billingRecords.id, id));
+    return record;
+  }
+
+  async createBillingRecord(userId: string, record: InsertBillingRecord): Promise<BillingRecord> {
+    const [created] = await db.insert(billingRecords).values({ ...record, userId }).returning();
+    return created;
+  }
+
+  async updateBillingRecord(id: number, updates: Partial<InsertBillingRecord>): Promise<BillingRecord> {
+    const [updated] = await db.update(billingRecords).set({ ...updates, updatedAt: new Date() }).where(eq(billingRecords.id, id)).returning();
+    return updated;
+  }
+
+  async deleteBillingRecord(id: number): Promise<void> {
+    await db.delete(billingRecords).where(eq(billingRecords.id, id));
+  }
+
+  // ==================
+  // Utah Codes
+  // ==================
+  async getUtahCodes(): Promise<UtahCode[]> {
+    return await db.select().from(utahCodes);
+  }
+
+  async searchUtahCodes(query: string): Promise<UtahCode[]> {
+    const searchTerm = `%${query}%`;
+    return await db.select().from(utahCodes).where(
+      or(
+        ilike(utahCodes.heading, searchTerm),
+        ilike(utahCodes.summary, searchTerm),
+        ilike(utahCodes.fullText, searchTerm),
+        ilike(utahCodes.section, searchTerm),
+        ilike(utahCodes.chapter, searchTerm),
+      )
+    );
+  }
+
+  async createUtahCode(code: Omit<UtahCode, 'id'>): Promise<UtahCode> {
+    const [created] = await db.insert(utahCodes).values(code).returning();
+    return created;
   }
 }
 

@@ -493,3 +493,144 @@ export const PROVIDER_SPECIALTIES = [
   { id: "trauma", name: "Trauma Specialist" },
   { id: "general", name: "General Psychiatry" },
 ];
+
+// ============================================
+// CLIENT PORTAL ACCOUNTS TABLE
+// ============================================
+export const clientPortalAccounts = pgTable("client_portal_accounts", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  email: text("email").notNull(),
+  hashedPassword: text("hashed_password").notNull(),
+  status: text("status").default("active"),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientPortalAccountSchema = createInsertSchema(clientPortalAccounts).omit({
+  id: true, createdAt: true, lastLoginAt: true
+});
+export type ClientPortalAccount = typeof clientPortalAccounts.$inferSelect;
+export type InsertClientPortalAccount = z.infer<typeof insertClientPortalAccountSchema>;
+
+// ============================================
+// MESSAGE THREADS TABLE
+// ============================================
+export const messageThreads = pgTable("message_threads", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  subject: text("subject").notNull(),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  status: text("status").default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMessageThreadSchema = createInsertSchema(messageThreads).omit({
+  id: true, createdAt: true, lastMessageAt: true
+});
+export type MessageThread = typeof messageThreads.$inferSelect;
+export type InsertMessageThread = z.infer<typeof insertMessageThreadSchema>;
+
+// ============================================
+// MESSAGES TABLE
+// ============================================
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  threadId: integer("thread_id").notNull().references(() => messageThreads.id),
+  senderType: text("sender_type").notNull(), // provider, client
+  body: text("body").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true, createdAt: true, isRead: true
+});
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+
+// ============================================
+// INTAKE FORMS TABLE
+// ============================================
+export const intakeForms = pgTable("intake_forms", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  formType: text("form_type").notNull(), // demographics, mental-health-history, consent, insurance-info
+  formData: jsonb("form_data").$type<Record<string, any>>().default({}),
+  status: text("status").default("pending"), // pending, submitted, reviewed
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertIntakeFormSchema = createInsertSchema(intakeForms).omit({
+  id: true, createdAt: true, submittedAt: true, reviewedAt: true
+});
+export type IntakeForm = typeof intakeForms.$inferSelect;
+export type InsertIntakeForm = z.infer<typeof insertIntakeFormSchema>;
+
+// ============================================
+// BILLING RECORDS TABLE
+// ============================================
+export const billingRecords = pgTable("billing_records", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  noteId: integer("note_id").references(() => soapNotes.id),
+  serviceDate: timestamp("service_date").notNull(),
+  cptCode: text("cpt_code").notNull(),
+  icdCodes: jsonb("icd_codes").$type<string[]>().default([]),
+  amount: integer("amount").default(0),
+  insuranceProvider: text("insurance_provider"),
+  claimStatus: text("claim_status").default("unbilled"), // unbilled, submitted, paid, denied, appealed
+  paymentReceived: integer("payment_received").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBillingRecordSchema = createInsertSchema(billingRecords).omit({
+  id: true, userId: true, createdAt: true, updatedAt: true
+});
+export type BillingRecord = typeof billingRecords.$inferSelect;
+export type InsertBillingRecord = z.infer<typeof insertBillingRecordSchema>;
+
+// ============================================
+// UTAH MENTAL HEALTH CODES TABLE
+// ============================================
+export const utahCodes = pgTable("utah_codes", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  chapter: text("chapter").notNull(),
+  section: text("section").notNull(),
+  heading: text("heading").notNull(),
+  summary: text("summary").notNull(),
+  fullText: text("full_text").notNull(),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  sourceUrl: text("source_url"),
+  category: text("category").default("general"), // licensing, scope-of-practice, confidentiality, telehealth, billing, ethics, records, supervision
+});
+
+export type UtahCode = typeof utahCodes.$inferSelect;
+
+export const INTAKE_FORM_TYPES = [
+  { id: "demographics", name: "Demographics & Contact Info" },
+  { id: "mental-health-history", name: "Mental Health History" },
+  { id: "consent", name: "Informed Consent" },
+  { id: "insurance-info", name: "Insurance Information" },
+];
+
+export const UTAH_CODE_CATEGORIES = [
+  { id: "licensing", name: "Licensing Requirements" },
+  { id: "scope-of-practice", name: "Scope of Practice" },
+  { id: "confidentiality", name: "Confidentiality & Privacy" },
+  { id: "telehealth", name: "Telehealth Regulations" },
+  { id: "billing", name: "Billing & Insurance" },
+  { id: "ethics", name: "Ethics & Standards" },
+  { id: "records", name: "Records & Documentation" },
+  { id: "supervision", name: "Supervision Requirements" },
+  { id: "reporting", name: "Mandatory Reporting" },
+];

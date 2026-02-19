@@ -19,6 +19,11 @@ import SettingsPage from "@/pages/settings";
 import ReferralsPage from "@/pages/referrals";
 import SafetyPlansPage from "@/pages/safety-plans";
 import CeResourcesPage from "@/pages/ce-resources";
+import MessagingPage from "@/pages/messaging";
+import BillingPage from "@/pages/billing";
+import UtahLawPage from "@/pages/utah-law";
+import PortalLogin from "@/pages/portal-login";
+import PortalDashboard from "@/pages/portal-dashboard";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -41,6 +46,9 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
 function Router() {
   return (
     <Switch>
+      <Route path="/portal/login" component={PortalLogin} />
+      <Route path="/portal/dashboard" component={PortalDashboard} />
+      <Route path="/portal" component={PortalDashboard} />
       <Route path="/api/login" component={AuthPage} />
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/notes" component={() => <ProtectedRoute component={Dashboard} />} />
@@ -56,6 +64,9 @@ function Router() {
       <Route path="/referrals" component={() => <ProtectedRoute component={ReferralsPage} />} />
       <Route path="/safety-plans" component={() => <ProtectedRoute component={SafetyPlansPage} />} />
       <Route path="/ce-resources" component={() => <ProtectedRoute component={CeResourcesPage} />} />
+      <Route path="/messaging" component={() => <ProtectedRoute component={MessagingPage} />} />
+      <Route path="/billing" component={() => <ProtectedRoute component={BillingPage} />} />
+      <Route path="/utah-law" component={() => <ProtectedRoute component={UtahLawPage} />} />
       <Route component={NotFound} />
     </Switch>
   );

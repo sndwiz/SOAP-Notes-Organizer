@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   FileText, Home, LogOut, PlusCircle, Menu, Activity, Users,
   Calendar, CheckSquare, FolderOpen, Settings, Bell, BarChart3,
-  Share2, Shield, GraduationCap
+  Share2, Shield, GraduationCap, DollarSign, Scale, MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -34,6 +34,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
     { name: 'All Notes', href: '/notes', icon: FileText },
     { name: 'Calendar', href: '/calendar', icon: Calendar },
     { name: 'Clients', href: '/clients', icon: Users },
+    { name: 'Messaging', href: '/messaging', icon: MessageSquare },
   ];
 
   const manageNav = [
@@ -42,7 +43,9 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Referrals', href: '/referrals', icon: Share2 },
     { name: 'Safety Plans', href: '/safety-plans', icon: Shield },
+    { name: 'Billing', href: '/billing', icon: DollarSign },
     { name: 'CE Resources', href: '/ce-resources', icon: GraduationCap },
+    { name: 'Utah Law', href: '/utah-law', icon: Scale },
   ];
 
   const systemNav = [
