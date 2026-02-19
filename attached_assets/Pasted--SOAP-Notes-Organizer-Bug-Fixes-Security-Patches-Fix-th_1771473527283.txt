@@ -1,0 +1,61 @@
+# SOAP Notes Organizer - Bug Fixes & Security Patches
+
+Fix the following issues in order of priority. Do not refactor or redesign anything — just fix these specific problems.
+
+---
+
+## 1. CRITICAL: Add ownership checks to Task update and delete routes
+
+In `server/routes.ts`, the `PUT /api/tasks/:id` and `DELETE /api/tasks/:id` routes do NOT verify that the task belongs to the authenticated user. Every other resource (notes, clients, referrals, safety plans, etc.) checks `existing.userId !== req.user.claims.sub` before allowing modifications. Tasks skip this entirely.
+
+**Fix:** Before updating or deleting a task, fetch the task by ID, verify it exists (return 404 if not), and verify `task.userId === req.user.claims.sub` (return 403 if not). Match the exact same pattern used in the SOAP notes delete route.
+
+---
+
+## 2. CRITICAL: Add ownership check to Notification markRead route
+
+In `server/routes.ts`, the `PUT /api/notifications/:id/read` route marks any notification as read without verifying the notification belongs to the authenticated user.
+
+**Fix:** Fetch the notification first, check it exists (404), check `notification.userId === req.user.claims.sub` (403), then proceed. You'll need to add a `getNotification(id)` method to the storage interface and `DatabaseStorage` class in `server/storage.ts` that fetches a single notification by ID.
+
+---
+
+## 3. Add graceful handling for missing OpenAI API key
+
+In `server/routes.ts`, the AI suggestion endpoint (`POST /api/soap-notes/:id/ai-suggest`) and the Utah codes AI search endpoint (`POST /api/utah-codes/ai-search`) both instantiate OpenAI without checking if the API key exists.
+
+**Fix:** At the top of both route handlers, before creating the OpenAI client, check if `process.env.AI_INTEGRATIONS_OPENAI_API_KEY` exists. If not, return `res.status(503).json({ message: "AI features are not configured. Please set the OpenAI API key." })`.
+
+---
+
+## 4. Fix inconsistent `updatedAt` handling in storage update methods
+
+In `server/storage.ts`, some update methods set `updatedAt: new Date()` and some don't. Review ALL update methods in `DatabaseStorage` and ensure every one that updates a table with an `updatedAt` column includes `updatedAt: new Date()` in the `.set()` call. The affected tables with `updatedAt` columns are: `soapNotes`, `clients`, `tasks`, `referrals`, `safetyPlans`, `billingRecords`, `consentDocuments`, `treatmentPlans`, `messageThreads`.
+
+---
+
+## 5. Fix N+1 query in `getUnreadMessageCount`
+
+In `server/storage.ts`, the `getUnreadMessageCount` method fetches all threads for a user, then loops through each thread making individual queries for unread messages. Replace this with a single joined query that counts unread messages across all threads for the user. Use a Drizzle `select` with a join between `messageThreads` and `messages` where `messages.senderType = 'client'` and `messages.isRead = false` and `messageThreads.userId = userId`.
+
+---
+
+## 6. Enable auto-creation of sessions table
+
+In `server/replit_integrations/auth/replitAuth.ts`, the connect-pg-simple session store has `createTableIfMissing: false`. Change this to `createTableIfMissing: true` so the app doesn't crash on first deployment if the sessions table hasn't been created yet.
+
+---
+
+## 7. Add basic rate limiting to portal login
+
+Install `express-rate-limit` and add rate limiting to the `POST /api/portal/login` route. Limit to 5 attempts per 15 minutes per IP. This prevents brute-force attacks on client portal passwords.
+
+```
+npm install express-rate-limit
+```
+
+Apply the limiter only to the portal login route, not globally.
+
+---
+
+Do these fixes one at a time, test each one compiles, and don't touch anything else.

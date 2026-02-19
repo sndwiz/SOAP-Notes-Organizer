@@ -7,6 +7,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import multer from "multer";
 import OpenAI from "openai";
 import bcrypt from "bcryptjs";
+import rateLimit from "express-rate-limit";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -177,6 +178,9 @@ export async function registerRoutes(
   app.put(api.tasks.update.path, isAuthenticated, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
+      const existing = await storage.getTask(id);
+      if (!existing) return res.status(404).json({ message: "Task not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
       const input = api.tasks.update.input.parse(req.body);
       const updated = await storage.updateTask(id, input);
       res.json(updated);
@@ -190,7 +194,11 @@ export async function registerRoutes(
 
   app.delete(api.tasks.delete.path, isAuthenticated, async (req: any, res) => {
     try {
-      await storage.deleteTask(Number(req.params.id));
+      const id = Number(req.params.id);
+      const existing = await storage.getTask(id);
+      if (!existing) return res.status(404).json({ message: "Task not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteTask(id);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
@@ -280,7 +288,11 @@ export async function registerRoutes(
 
   app.put(api.notifications.markRead.path, isAuthenticated, async (req: any, res) => {
     try {
-      const updated = await storage.markNotificationRead(Number(req.params.id));
+      const id = Number(req.params.id);
+      const existing = await storage.getNotification(id);
+      if (!existing) return res.status(404).json({ message: "Notification not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const updated = await storage.markNotificationRead(id);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
@@ -492,6 +504,10 @@ export async function registerRoutes(
       const note = await storage.getSoapNote(id);
       if (!note) return res.status(404).json({ message: "Note not found" });
       if (note.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        return res.status(503).json({ message: "AI features are not configured. Please set the OpenAI API key." });
+      }
 
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -958,6 +974,10 @@ Suggest up to 3 diagnoses ranked by confidence. Use standard ICD-10-CM F-codes. 
       const input = api.utahCodes.search.input.parse(req.body);
       const results = await storage.searchUtahCodes(input.query);
 
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        return res.status(503).json({ message: "AI features are not configured. Please set the OpenAI API key." });
+      }
+
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -1004,7 +1024,15 @@ Provide a concise, helpful summary of the relevant Utah regulations related to t
     next();
   };
 
-  app.post(api.portalAuth.login.path, async (req: any, res) => {
+  const portalLoginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { message: "Too many login attempts. Please try again in 15 minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.post(api.portalAuth.login.path, portalLoginLimiter, async (req: any, res) => {
     try {
       const input = api.portalAuth.login.input.parse(req.body);
       const account = await storage.getPortalAccountByEmail(input.email);

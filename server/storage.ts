@@ -18,7 +18,7 @@ import {
   consentDocuments, type ConsentDocument, type InsertConsentDocument,
   treatmentPlans, type TreatmentPlan, type InsertTreatmentPlan,
 } from "@shared/schema";
-import { eq, desc, and, or, ilike } from "drizzle-orm";
+import { eq, desc, and, or, ilike, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   // SOAP Notes
@@ -37,6 +37,7 @@ export interface IStorage {
 
   // Tasks
   getTasks(userId: string): Promise<Task[]>;
+  getTask(id: number): Promise<Task | undefined>;
   createTask(userId: string, task: InsertTask): Promise<Task>;
   updateTask(id: number, updates: Partial<InsertTask>): Promise<Task>;
   deleteTask(id: number): Promise<void>;
@@ -49,6 +50,7 @@ export interface IStorage {
 
   // Notifications
   getNotifications(userId: string): Promise<Notification[]>;
+  getNotification(id: number): Promise<Notification | undefined>;
   createNotification(userId: string, notif: InsertNotification): Promise<Notification>;
   markNotificationRead(id: number): Promise<Notification>;
   markAllNotificationsRead(userId: string): Promise<number>;
@@ -193,6 +195,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(desc(tasks.createdAt));
   }
 
+  async getTask(id: number): Promise<Task | undefined> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return task;
+  }
+
   async createTask(userId: string, task: InsertTask): Promise<Task> {
     const [created] = await db.insert(tasks).values({ ...task, userId }).returning();
     return created;
@@ -236,6 +243,11 @@ export class DatabaseStorage implements IStorage {
   // ==================
   async getNotifications(userId: string): Promise<Notification[]> {
     return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+  }
+
+  async getNotification(id: number): Promise<Notification | undefined> {
+    const [notif] = await db.select().from(notifications).where(eq(notifications.id, id));
+    return notif;
   }
 
   async createNotification(userId: string, notif: InsertNotification): Promise<Notification> {
@@ -397,13 +409,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUnreadMessageCount(userId: string): Promise<number> {
-    const threads = await db.select().from(messageThreads).where(eq(messageThreads.userId, userId));
-    let count = 0;
-    for (const thread of threads) {
-      const unread = await db.select().from(messages).where(and(eq(messages.threadId, thread.id), eq(messages.senderType, 'client'), eq(messages.isRead, false)));
-      count += unread.length;
-    }
-    return count;
+    const result = await db
+      .select({ total: count() })
+      .from(messages)
+      .innerJoin(messageThreads, eq(messages.threadId, messageThreads.id))
+      .where(
+        and(
+          eq(messageThreads.userId, userId),
+          eq(messages.senderType, 'client'),
+          eq(messages.isRead, false)
+        )
+      );
+    return Number(result[0]?.total ?? 0);
   }
 
   // ==================
