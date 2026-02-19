@@ -5,6 +5,9 @@ import {
   tasks, type Task, type InsertTask,
   documents, type Document, type InsertDocument,
   notifications, type Notification, type InsertNotification,
+  referrals, type Referral, type InsertReferral,
+  safetyPlans, type SafetyPlan, type InsertSafetyPlan,
+  ceCredits, type CeCredit, type InsertCeCredit,
 } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -40,6 +43,27 @@ export interface IStorage {
   createNotification(userId: string, notif: InsertNotification): Promise<Notification>;
   markNotificationRead(id: number): Promise<Notification>;
   markAllNotificationsRead(userId: string): Promise<number>;
+
+  // Referrals
+  getReferrals(userId: string): Promise<Referral[]>;
+  getReferral(id: number): Promise<Referral | undefined>;
+  createReferral(userId: string, referral: InsertReferral): Promise<Referral>;
+  updateReferral(id: number, updates: Partial<InsertReferral>): Promise<Referral>;
+  deleteReferral(id: number): Promise<void>;
+
+  // Safety Plans
+  getSafetyPlans(userId: string): Promise<SafetyPlan[]>;
+  getSafetyPlan(id: number): Promise<SafetyPlan | undefined>;
+  createSafetyPlan(userId: string, plan: InsertSafetyPlan): Promise<SafetyPlan>;
+  updateSafetyPlan(id: number, updates: Partial<InsertSafetyPlan>): Promise<SafetyPlan>;
+  deleteSafetyPlan(id: number): Promise<void>;
+
+  // CE Credits
+  getCeCredits(userId: string): Promise<CeCredit[]>;
+  getCeCredit(id: number): Promise<CeCredit | undefined>;
+  createCeCredit(userId: string, credit: InsertCeCredit): Promise<CeCredit>;
+  updateCeCredit(id: number, updates: Partial<InsertCeCredit>): Promise<CeCredit>;
+  deleteCeCredit(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -160,6 +184,84 @@ export class DatabaseStorage implements IStorage {
   async markAllNotificationsRead(userId: string): Promise<number> {
     const result = await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false))).returning();
     return result.length;
+  }
+
+  // ==================
+  // Referrals
+  // ==================
+  async getReferrals(userId: string): Promise<Referral[]> {
+    return await db.select().from(referrals).where(eq(referrals.userId, userId)).orderBy(desc(referrals.createdAt));
+  }
+
+  async getReferral(id: number): Promise<Referral | undefined> {
+    const [ref] = await db.select().from(referrals).where(eq(referrals.id, id));
+    return ref;
+  }
+
+  async createReferral(userId: string, referral: InsertReferral): Promise<Referral> {
+    const [created] = await db.insert(referrals).values({ ...referral, userId }).returning();
+    return created;
+  }
+
+  async updateReferral(id: number, updates: Partial<InsertReferral>): Promise<Referral> {
+    const [updated] = await db.update(referrals).set({ ...updates, updatedAt: new Date() }).where(eq(referrals.id, id)).returning();
+    return updated;
+  }
+
+  async deleteReferral(id: number): Promise<void> {
+    await db.delete(referrals).where(eq(referrals.id, id));
+  }
+
+  // ==================
+  // Safety Plans
+  // ==================
+  async getSafetyPlans(userId: string): Promise<SafetyPlan[]> {
+    return await db.select().from(safetyPlans).where(eq(safetyPlans.userId, userId)).orderBy(desc(safetyPlans.updatedAt));
+  }
+
+  async getSafetyPlan(id: number): Promise<SafetyPlan | undefined> {
+    const [plan] = await db.select().from(safetyPlans).where(eq(safetyPlans.id, id));
+    return plan;
+  }
+
+  async createSafetyPlan(userId: string, plan: InsertSafetyPlan): Promise<SafetyPlan> {
+    const [created] = await db.insert(safetyPlans).values({ ...plan, userId }).returning();
+    return created;
+  }
+
+  async updateSafetyPlan(id: number, updates: Partial<InsertSafetyPlan>): Promise<SafetyPlan> {
+    const [updated] = await db.update(safetyPlans).set({ ...updates, updatedAt: new Date() }).where(eq(safetyPlans.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSafetyPlan(id: number): Promise<void> {
+    await db.delete(safetyPlans).where(eq(safetyPlans.id, id));
+  }
+
+  // ==================
+  // CE Credits
+  // ==================
+  async getCeCredits(userId: string): Promise<CeCredit[]> {
+    return await db.select().from(ceCredits).where(eq(ceCredits.userId, userId)).orderBy(desc(ceCredits.createdAt));
+  }
+
+  async getCeCredit(id: number): Promise<CeCredit | undefined> {
+    const [credit] = await db.select().from(ceCredits).where(eq(ceCredits.id, id));
+    return credit;
+  }
+
+  async createCeCredit(userId: string, credit: InsertCeCredit): Promise<CeCredit> {
+    const [created] = await db.insert(ceCredits).values({ ...credit, userId }).returning();
+    return created;
+  }
+
+  async updateCeCredit(id: number, updates: Partial<InsertCeCredit>): Promise<CeCredit> {
+    const [updated] = await db.update(ceCredits).set(updates).where(eq(ceCredits.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCeCredit(id: number): Promise<void> {
+    await db.delete(ceCredits).where(eq(ceCredits.id, id));
   }
 }
 

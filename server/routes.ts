@@ -5,6 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import multer from "multer";
+import OpenAI from "openai";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -291,6 +292,258 @@ export async function registerRoutes(
       res.json({ count });
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Referrals
+  // ==================
+  app.get(api.referrals.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const result = await storage.getReferrals(req.user.claims.sub);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.referrals.get.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const referral = await storage.getReferral(Number(req.params.id));
+      if (!referral) return res.status(404).json({ message: "Referral not found" });
+      if (referral.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      res.json(referral);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.referrals.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.referrals.create.input.parse(req.body);
+      const referral = await storage.createReferral(req.user.claims.sub, input);
+      res.status(201).json(referral);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.referrals.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getReferral(id);
+      if (!existing) return res.status(404).json({ message: "Referral not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.referrals.update.input.parse(req.body);
+      const updated = await storage.updateReferral(id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete(api.referrals.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getReferral(id);
+      if (!existing) return res.status(404).json({ message: "Referral not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteReferral(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // Safety Plans
+  // ==================
+  app.get(api.safetyPlans.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const result = await storage.getSafetyPlans(req.user.claims.sub);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get(api.safetyPlans.get.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const plan = await storage.getSafetyPlan(Number(req.params.id));
+      if (!plan) return res.status(404).json({ message: "Safety plan not found" });
+      if (plan.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      res.json(plan);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.safetyPlans.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.safetyPlans.create.input.parse(req.body);
+      const plan = await storage.createSafetyPlan(req.user.claims.sub, input);
+      res.status(201).json(plan);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.safetyPlans.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getSafetyPlan(id);
+      if (!existing) return res.status(404).json({ message: "Safety plan not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.safetyPlans.update.input.parse(req.body);
+      const updated = await storage.updateSafetyPlan(id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete(api.safetyPlans.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getSafetyPlan(id);
+      if (!existing) return res.status(404).json({ message: "Safety plan not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteSafetyPlan(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // CE Credits
+  // ==================
+  app.get(api.ceCredits.list.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const result = await storage.getCeCredits(req.user.claims.sub);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post(api.ceCredits.create.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const input = api.ceCredits.create.input.parse(req.body);
+      const credit = await storage.createCeCredit(req.user.claims.sub, input);
+      res.status(201).json(credit);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put(api.ceCredits.update.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getCeCredit(id);
+      if (!existing) return res.status(404).json({ message: "CE credit not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      const input = api.ceCredits.update.input.parse(req.body);
+      const updated = await storage.updateCeCredit(id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete(api.ceCredits.delete.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getCeCredit(id);
+      if (!existing) return res.status(404).json({ message: "CE credit not found" });
+      if (existing.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      await storage.deleteCeCredit(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ==================
+  // AI Diagnosis/CPT Suggestion
+  // ==================
+  app.post(api.soapNotes.aiSuggest.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const note = await storage.getSoapNote(id);
+      if (!note) return res.status(404).json({ message: "Note not found" });
+      if (note.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prompt = `You are a clinical coding assistant for a mental health professional. Based on the following SOAP note content, suggest the most appropriate ICD-10 diagnosis codes and CPT billing code.
+
+SOAP Note:
+- Subjective: ${note.subjective || 'Not provided'}
+- Objective: ${note.objective || 'Not provided'}
+- Assessment: ${note.assessment || 'Not provided'}
+- Plan: ${note.plan || 'Not provided'}
+- PHQ-9 Score: ${note.phq9Score || 'N/A'}
+- GAD-7 Score: ${note.gad7Score || 'N/A'}
+- Session Duration: ${note.startTime && note.endTime ? 'Available' : 'Not specified'}
+- Current CPT Code: ${note.cptCode || 'Not set'}
+- Is Telehealth: ${note.isTelehealth ? 'Yes' : 'No'}
+
+Respond in valid JSON only with this exact structure:
+{
+  "suggestedDiagnoses": [
+    {"code": "F-code", "name": "Diagnosis name", "confidence": 0.0-1.0}
+  ],
+  "suggestedCpt": "CPT code",
+  "reasoning": "Brief clinical reasoning for suggestions"
+}
+
+Suggest up to 3 diagnoses ranked by confidence. Use standard ICD-10-CM F-codes. For CPT, consider session duration and telehealth status.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "AI returned empty response" });
+      }
+
+      const parsed = JSON.parse(content);
+
+      await storage.updateSoapNote(id, {
+        aiSuggestedDiagnoses: parsed.suggestedDiagnoses,
+        aiSuggestedCpt: parsed.suggestedCpt,
+      });
+
+      res.json(parsed);
+    } catch (error) {
+      console.error("AI suggestion error:", error);
+      res.status(500).json({ message: "Failed to generate AI suggestions" });
     }
   });
 

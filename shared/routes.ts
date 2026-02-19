@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertSoapNoteSchema, soapNotes, insertClientSchema, clients, insertTaskSchema, tasks, insertDocumentSchema, documents, insertNotificationSchema, notifications } from './schema';
+import { insertSoapNoteSchema, soapNotes, insertClientSchema, clients, insertTaskSchema, tasks, insertDocumentSchema, documents, insertNotificationSchema, notifications, insertReferralSchema, referrals, insertSafetyPlanSchema, safetyPlans, insertCeCreditSchema, ceCredits } from './schema';
 
 export const errorSchemas = {
   validation: z.object({ message: z.string(), field: z.string().optional() }),
@@ -148,6 +148,94 @@ export const api = {
       method: 'PUT' as const,
       path: '/api/notifications/read-all' as const,
       responses: { 200: z.object({ count: z.number() }) },
+    },
+  },
+
+  // Referrals
+  referrals: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/referrals' as const,
+      responses: { 200: z.array(z.custom<typeof referrals.$inferSelect>()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/referrals/:id' as const,
+      responses: { 200: z.custom<typeof referrals.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/referrals' as const,
+      input: insertReferralSchema,
+      responses: { 201: z.custom<typeof referrals.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/referrals/:id' as const,
+      input: insertReferralSchema.partial(),
+      responses: { 200: z.custom<typeof referrals.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/referrals/:id' as const,
+      responses: { 204: z.void(), 404: errorSchemas.notFound },
+    },
+  },
+
+  // Safety Plans
+  safetyPlans: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/safety-plans' as const,
+      responses: { 200: z.array(z.custom<typeof safetyPlans.$inferSelect>()) },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/safety-plans/:id' as const,
+      responses: { 200: z.custom<typeof safetyPlans.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/safety-plans' as const,
+      input: insertSafetyPlanSchema,
+      responses: { 201: z.custom<typeof safetyPlans.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/safety-plans/:id' as const,
+      input: insertSafetyPlanSchema.partial(),
+      responses: { 200: z.custom<typeof safetyPlans.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/safety-plans/:id' as const,
+      responses: { 204: z.void(), 404: errorSchemas.notFound },
+    },
+  },
+
+  // CE Credits
+  ceCredits: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/ce-credits' as const,
+      responses: { 200: z.array(z.custom<typeof ceCredits.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/ce-credits' as const,
+      input: insertCeCreditSchema,
+      responses: { 201: z.custom<typeof ceCredits.$inferSelect>(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/ce-credits/:id' as const,
+      input: insertCeCreditSchema.partial(),
+      responses: { 200: z.custom<typeof ceCredits.$inferSelect>(), 404: errorSchemas.notFound },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/ce-credits/:id' as const,
+      responses: { 204: z.void(), 404: errorSchemas.notFound },
     },
   },
 };

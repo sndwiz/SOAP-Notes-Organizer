@@ -16,6 +16,9 @@ import DocumentsPage from "@/pages/documents";
 import AnalyticsPage from "@/pages/analytics";
 import NotificationsPage from "@/pages/notifications";
 import SettingsPage from "@/pages/settings";
+import ReferralsPage from "@/pages/referrals";
+import SafetyPlansPage from "@/pages/safety-plans";
+import CeResourcesPage from "@/pages/ce-resources";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -50,6 +53,9 @@ function Router() {
       <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} />} />
       <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
+      <Route path="/referrals" component={() => <ProtectedRoute component={ReferralsPage} />} />
+      <Route path="/safety-plans" component={() => <ProtectedRoute component={SafetyPlansPage} />} />
+      <Route path="/ce-resources" component={() => <ProtectedRoute component={CeResourcesPage} />} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -376,3 +376,120 @@ export const GAD7_QUESTIONS = [
 export const DOCUMENT_CATEGORIES = [
   "general", "intake", "consent", "assessment", "insurance", "discharge", "treatment-plan", "progress-note", "referral"
 ];
+
+// ============================================
+// REFERRALS TABLE
+// ============================================
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").references(() => clients.id),
+  providerName: text("provider_name").notNull(),
+  providerType: text("provider_type").notNull(), // psychiatrist, psychologist, primary-care, specialist
+  specialty: text("specialty"), // med-management, neuropsych, substance-abuse, child-adolescent, geriatric
+  phone: text("phone"),
+  fax: text("fax"),
+  email: text("email"),
+  address: text("address"),
+  insurancesAccepted: jsonb("insurances_accepted").$type<string[]>().default([]),
+  acceptingNewPatients: boolean("accepting_new_patients").default(true),
+  telehealth: boolean("telehealth").default(false),
+  notes: text("notes"),
+  referralDate: timestamp("referral_date").defaultNow(),
+  status: text("status").default("pending"), // pending, sent, accepted, declined, completed
+  reasonForReferral: text("reason_for_referral"),
+  roiSigned: boolean("roi_signed").default(false),
+  roiDate: timestamp("roi_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertReferralSchema = createInsertSchema(referrals).omit({
+  id: true, userId: true, createdAt: true, updatedAt: true
+});
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+
+// ============================================
+// SAFETY PLANS TABLE
+// ============================================
+export const safetyPlans = pgTable("safety_plans", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").references(() => clients.id),
+  clientName: text("client_name").notNull(),
+  warningSignals: jsonb("warning_signals").$type<string[]>().default([]),
+  copingStrategies: jsonb("coping_strategies").$type<string[]>().default([]),
+  socialDistractions: jsonb("social_distractions").$type<{name: string, phone?: string}[]>().default([]),
+  professionalContacts: jsonb("professional_contacts").$type<{name: string, phone?: string, role?: string}[]>().default([]),
+  emergencyContacts: jsonb("emergency_contacts").$type<{name: string, phone: string, relationship?: string}[]>().default([]),
+  crisisResources: jsonb("crisis_resources").$type<{name: string, phone: string}[]>().default([
+    { name: "988 Suicide & Crisis Lifeline", phone: "988" },
+    { name: "Crisis Text Line", phone: "Text HOME to 741741" },
+    { name: "Emergency Services", phone: "911" }
+  ]),
+  environmentSafety: jsonb("environment_safety").$type<string[]>().default([]),
+  reasonsForLiving: jsonb("reasons_for_living").$type<string[]>().default([]),
+  status: text("status").default("active"), // active, updated, archived
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSafetyPlanSchema = createInsertSchema(safetyPlans).omit({
+  id: true, userId: true, createdAt: true, updatedAt: true
+});
+export type SafetyPlan = typeof safetyPlans.$inferSelect;
+export type InsertSafetyPlan = z.infer<typeof insertSafetyPlanSchema>;
+
+// ============================================
+// CE CREDITS TABLE
+// ============================================
+export const ceCredits = pgTable("ce_credits", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  provider: text("provider"),
+  category: text("category").default("general"), // ethics, cultural-competency, supervision, clinical, general
+  hours: integer("hours").notNull(),
+  completionDate: timestamp("completion_date"),
+  expirationDate: timestamp("expiration_date"),
+  certificateUrl: text("certificate_url"),
+  notes: text("notes"),
+  status: text("status").default("completed"), // planned, in-progress, completed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCeCreditSchema = createInsertSchema(ceCredits).omit({
+  id: true, userId: true, createdAt: true
+});
+export type CeCredit = typeof ceCredits.$inferSelect;
+export type InsertCeCredit = z.infer<typeof insertCeCreditSchema>;
+
+// ============================================
+// CE REQUIREMENTS CONFIG
+// ============================================
+export const CE_CATEGORIES = [
+  { id: "ethics", name: "Ethics", requiredHours: 6 },
+  { id: "cultural-competency", name: "Cultural Competency", requiredHours: 4 },
+  { id: "supervision", name: "Supervision", requiredHours: 6 },
+  { id: "clinical", name: "Clinical Topics", requiredHours: 20 },
+  { id: "general", name: "General CE", requiredHours: 0 },
+];
+
+export const INSURANCE_PROVIDERS = [
+  "Aetna", "Anthem", "Blue Cross Blue Shield", "Cigna", "Humana",
+  "Kaiser Permanente", "Magellan", "Medicare", "Medicaid", "Optum",
+  "Oscar Health", "Tricare", "UnitedHealthcare", "Self-Pay", "Other"
+];
+
+export const PROVIDER_SPECIALTIES = [
+  { id: "med-management", name: "Medication Management" },
+  { id: "neuropsych", name: "Neuropsychological Testing" },
+  { id: "substance-abuse", name: "Substance Abuse Treatment" },
+  { id: "child-adolescent", name: "Child & Adolescent" },
+  { id: "geriatric", name: "Geriatric Psychiatry" },
+  { id: "forensic", name: "Forensic Psychiatry" },
+  { id: "eating-disorders", name: "Eating Disorders" },
+  { id: "trauma", name: "Trauma Specialist" },
+  { id: "general", name: "General Psychiatry" },
+];

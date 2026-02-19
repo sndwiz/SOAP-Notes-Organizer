@@ -3,7 +3,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import {
   FileText, Home, LogOut, PlusCircle, Menu, Activity, Users,
-  Calendar, CheckSquare, FolderOpen, Settings, Bell, BarChart3
+  Calendar, CheckSquare, FolderOpen, Settings, Bell, BarChart3,
+  Share2, Shield, GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -39,6 +40,9 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Documents', href: '/documents', icon: FolderOpen },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Referrals', href: '/referrals', icon: Share2 },
+    { name: 'Safety Plans', href: '/safety-plans', icon: Shield },
+    { name: 'CE Resources', href: '/ce-resources', icon: GraduationCap },
   ];
 
   const systemNav = [
