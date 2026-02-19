@@ -9,6 +9,13 @@ import Dashboard from "@/pages/dashboard";
 import AuthPage from "@/pages/auth-page";
 import CreateNote from "@/pages/create-note";
 import EditNote from "@/pages/edit-note";
+import ClientsPage from "@/pages/clients";
+import CalendarPage from "@/pages/calendar";
+import TasksPage from "@/pages/tasks";
+import DocumentsPage from "@/pages/documents";
+import AnalyticsPage from "@/pages/analytics";
+import NotificationsPage from "@/pages/notifications";
+import SettingsPage from "@/pages/settings";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -36,6 +43,13 @@ function Router() {
       <Route path="/notes" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/notes/new" component={() => <ProtectedRoute component={CreateNote} />} />
       <Route path="/notes/:id" component={(params) => <ProtectedRoute component={EditNote} params={params} />} />
+      <Route path="/clients" component={() => <ProtectedRoute component={ClientsPage} />} />
+      <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
+      <Route path="/tasks" component={() => <ProtectedRoute component={TasksPage} />} />
+      <Route path="/documents" component={() => <ProtectedRoute component={DocumentsPage} />} />
+      <Route path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} />} />
+      <Route path="/notifications" component={() => <ProtectedRoute component={NotificationsPage} />} />
+      <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
       <Route component={NotFound} />
     </Switch>
   );

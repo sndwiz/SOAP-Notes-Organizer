@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { 
@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Mic, 
+  MicOff,
   Save, 
   CheckCircle, 
   AlertCircle, 
@@ -28,11 +29,12 @@ import {
   Brain, 
   ClipboardCheck, 
   Activity,
-  FileText
+  FileText,
+  Search
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
 
 interface SoapEditorProps {
   initialData?: InsertSoapNote;
@@ -71,6 +73,10 @@ export function SoapEditor({ initialData, onSubmit, isSubmitting }: SoapEditorPr
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("session");
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingField, setRecordingField] = useState<string | null>(null);
+  const [diagnosisSearch, setDiagnosisSearch] = useState("");
+  const recognitionRef = useRef<any>(null);
+  const fieldRef = useRef<keyof InsertSoapNote | null>(null);
 
   const defaultValues: InsertSoapNote = initialData || {
     clientName: "",
@@ -100,43 +106,86 @@ export function SoapEditor({ initialData, onSubmit, isSubmitting }: SoapEditorPr
 
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = form;
 
-  // Simple dictation helper
+  const stopRecording = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.continuous = false;
+      try { recognitionRef.current.stop(); } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingField(null);
+    fieldRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => { stopRecording(); };
+  }, [stopRecording]);
+
   const toggleDictation = (field: keyof InsertSoapNote) => {
-    if (!('webkitSpeechRecognition' in window)) {
-      toast({
-        title: "Not Supported",
-        description: "Speech recognition is not supported in this browser.",
-        variant: "destructive"
-      });
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ title: "Not Supported", description: "Speech recognition is not supported in this browser. Try Chrome or Edge.", variant: "destructive" });
       return;
     }
 
     if (isRecording) {
-      setIsRecording(false);
-      // Logic to stop would go here if we kept a ref to the recognition instance
+      stopRecording();
       return;
     }
 
+    fieldRef.current = field;
     setIsRecording(true);
-    const recognition = new (window as any).webkitSpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    setRecordingField(field as string);
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognitionRef.current = recognition;
+
+    let finalTranscript = "";
 
     recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      const currentVal = watch(field) as string || "";
-      setValue(field, (currentVal + " " + transcript).trim(), { shouldDirty: true });
-      setIsRecording(false);
-      toast({ title: "Dictation Added", description: "Text appended to field." });
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += t + " ";
+          const currentField = fieldRef.current;
+          if (currentField) {
+            const currentVal = watch(currentField) as string || "";
+            setValue(currentField, (currentVal + " " + t).trim(), { shouldDirty: true });
+          }
+        } else {
+          interim += t;
+        }
+      }
     };
 
-    recognition.onerror = () => {
-      setIsRecording(false);
-      toast({ title: "Error", description: "Dictation failed.", variant: "destructive" });
+    recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech') {
+        return;
+      }
+      if (event.error === 'aborted') return;
+      stopRecording();
+      toast({ title: "Recording Error", description: `Dictation error: ${event.error}`, variant: "destructive" });
     };
 
-    recognition.onend = () => setIsRecording(false);
-    recognition.start();
+    recognition.onend = () => {
+      if (recognitionRef.current && isRecording && fieldRef.current) {
+        try { recognition.start(); } catch (e) {
+          stopRecording();
+        }
+      }
+    };
+
+    try {
+      recognition.start();
+      toast({ title: "Recording Started", description: "Speak continuously. Click stop when done." });
+    } catch (e) {
+      stopRecording();
+      toast({ title: "Error", description: "Could not start microphone.", variant: "destructive" });
+    }
   };
 
   // Auto-calculate scores
@@ -267,15 +316,27 @@ export function SoapEditor({ initialData, onSubmit, isSubmitting }: SoapEditorPr
                         name="cptCode"
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} defaultValue={field.value || "90837"}>
-                            <SelectTrigger>
+                            <SelectTrigger data-testid="select-cpt-code">
                               <SelectValue placeholder="Select CPT Code" />
                             </SelectTrigger>
-                            <SelectContent>
-                              {CPT_CODES.map(cpt => (
-                                <SelectItem key={cpt.code} value={cpt.code}>
-                                  <span className="font-mono font-bold mr-2">{cpt.code}</span>
-                                  <span className="text-muted-foreground text-xs">{cpt.description}</span>
-                                </SelectItem>
+                            <SelectContent className="max-h-[300px]">
+                              {Object.entries(
+                                CPT_CODES.reduce((acc: Record<string, typeof CPT_CODES>, cpt) => {
+                                  const cat = (cpt as any).category || 'Other';
+                                  if (!acc[cat]) acc[cat] = [];
+                                  acc[cat].push(cpt);
+                                  return acc;
+                                }, {})
+                              ).map(([category, codes]) => (
+                                <div key={category}>
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{category}</div>
+                                  {codes.map(cpt => (
+                                    <SelectItem key={cpt.code} value={cpt.code}>
+                                      <span className="font-mono font-bold mr-2">{cpt.code}</span>
+                                      <span className="text-muted-foreground text-xs">{cpt.description}</span>
+                                    </SelectItem>
+                                  ))}
+                                </div>
                               ))}
                             </SelectContent>
                           </Select>
@@ -332,13 +393,17 @@ export function SoapEditor({ initialData, onSubmit, isSubmitting }: SoapEditorPr
                     </div>
                     <Button 
                       type="button" 
-                      variant="ghost" 
+                      variant={recordingField === section ? "destructive" : "ghost"}
                       size="sm" 
                       onClick={() => toggleDictation(section as keyof InsertSoapNote)}
-                      className={isRecording ? "text-destructive animate-pulse" : "text-muted-foreground"}
+                      className={recordingField === section ? "animate-pulse" : "text-muted-foreground"}
+                      data-testid={`button-dictate-${section}`}
                     >
-                      <Mic className="h-4 w-4 mr-2" />
-                      {isRecording ? "Recording..." : "Dictate"}
+                      {recordingField === section ? (
+                        <><MicOff className="h-4 w-4 mr-2" /> Stop Recording</>
+                      ) : (
+                        <><Mic className="h-4 w-4 mr-2" /> Dictate</>
+                      )}
                     </Button>
                   </CardHeader>
                   <CardContent className="space-y-4">
