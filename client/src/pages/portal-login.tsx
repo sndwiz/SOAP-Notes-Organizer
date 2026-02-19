@@ -98,12 +98,12 @@ export default function PortalLogin() {
 
         <div className="text-center">
           <a
-            href="/api/login"
+            href="/welcome"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="link-provider-login"
+            data-testid="link-back-to-landing"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Provider login
+            Back to role selection
           </a>
         </div>
       </div>

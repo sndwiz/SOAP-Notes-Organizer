@@ -91,6 +91,9 @@ shared/
 - Added session auto-timeout for HIPAA security
 - Built 8 printable clinical document templates with @media print formatting
 - Updated navigation sidebar with all new sections
+- Added role selection landing page (/welcome) - users choose "I'm a Therapist" or "I'm a Client" before being directed to the appropriate login
+- Provider login at /provider/login (Replit Auth), Client login at /portal/login (email/password)
+- Unauthenticated users visiting / see the landing page with role selection
 
 ## User Preferences
 - PWA approach for mobile instead of native apps

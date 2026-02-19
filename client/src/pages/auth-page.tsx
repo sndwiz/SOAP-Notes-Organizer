@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, ShieldCheck, Zap } from "lucide-react";
+import { Activity, ShieldCheck, Zap, ArrowLeft } from "lucide-react";
 
 export default function AuthPage() {
   const { user, isLoading } = useAuth();
@@ -78,6 +78,17 @@ export default function AuthPage() {
               By continuing, you agree to our Terms of Service and Privacy Policy.
               This system is for authorized clinical use only.
             </p>
+
+            <div className="text-center mt-6">
+              <a
+                href="/welcome"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="link-back-to-landing"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to role selection
+              </a>
+            </div>
           </CardContent>
         </Card>
       </div>

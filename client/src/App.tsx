@@ -26,6 +26,7 @@ import CompliancePage from "@/pages/compliance";
 import PaperworkPage from "@/pages/paperwork";
 import PortalLogin from "@/pages/portal-login";
 import PortalDashboard from "@/pages/portal-dashboard";
+import Landing from "@/pages/landing";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -39,7 +40,7 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
   }
 
   if (!user) {
-    return <AuthPage />;
+    return <Landing />;
   }
 
   return <Component {...rest} />;
@@ -48,6 +49,8 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
 function Router() {
   return (
     <Switch>
+      <Route path="/welcome" component={Landing} />
+      <Route path="/provider/login" component={AuthPage} />
       <Route path="/portal/login" component={PortalLogin} />
       <Route path="/portal/dashboard" component={PortalDashboard} />
       <Route path="/portal" component={PortalDashboard} />
